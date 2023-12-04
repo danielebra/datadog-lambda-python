@@ -4,10 +4,14 @@ import os
 
 from unittest.mock import MagicMock, patch
 
+from ddtrace.context import Context
+from datadog_lambda.constants import XraySubsegment
+
 from datadog_lambda.xray import (
     get_xray_host_port,
     build_segment_payload,
     build_segment,
+    parse_xray_header,
     send_segment,
 )
 
@@ -89,3 +93,18 @@ class TestXRay(unittest.TestCase):
         self.assertEqual("datadog-metadata", jsonResult["name"])
         self.assertEqual("subsegment", jsonResult["type"])
         self.assertEqual("myValue", metadataJson["datadog"]["myKey"])
+
+    def test_replicate_runtime_error(self):
+        xray_context = parse_xray_header("Root=1-656d4445-0060ba5279ca50be0db44474;Parent=06d7ef844a0c5c64;Sampled=1")
+        dd_context = Context(
+            trace_id=1894532486775893021,
+            span_id=8491654256788888308,
+            meta={
+                "traceparent": "00-00000000000000001a4abb4251b6ec1d-75d86a8e4b55daf4-01",
+                "tracestate": "dd=s:1;t.dm:-1",
+                "_dd.p.dm": "-1",
+            },
+            metrics={"_sampling_priority_v1": 1},
+            span_links=[],
+        )
+        build_segment(xray_context, XraySubsegment.TRACE_KEY, dd_context)
